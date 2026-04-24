@@ -1,0 +1,130 @@
+name: stocksproject
+services:
+ 
+  postgres:
+    image: postgres:16
+    container_name: stocks_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       stocksdb
+      POSTGRES_USER:     stocksuser
+      POSTGRES_PASSWORD: stockspass
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - stocks_net
+ 
+  loader:
+    build: .
+    container_name: stocks_loader
+    depends_on:
+      - postgres
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: stocksdb
+      DB_USER: stocksuser
+      DB_PASS: stockspass
+    profiles:
+      - manual
+    networks:
+      - stocks_net
+ 
+  # ── Airflow ──────────────────────────────────────────
+  airflow-db:
+    image: postgres:16
+    container_name: airflow_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       airflow
+      POSTGRES_USER:     airflow
+      POSTGRES_PASSWORD: airflow
+    volumes:
+      - airflow_pgdata:/var/lib/postgresql/data
+    networks:
+      - default
+ 
+  airflow-init:
+    image: apache/airflow:2.9.1
+    container_name: airflow_init
+    depends_on:
+      - airflow-db
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__WEBSERVER__SECRET_KEY: "mysecretkey123"
+    command: >
+      bash -c "
+        pip install apache-airflow-providers-docker &&
+        airflow db migrate &&
+        airflow users create
+          --username admin
+          --password admin
+          --firstname Admin
+          --lastname User
+          --role Admin
+          --email admin@example.com || true
+      "
+    restart: "no"
+    networks:
+      - default
+ 
+  airflow-webserver:
+    image: apache/airflow:2.9.1
+    container_name: airflow_webserver
+    restart: unless-stopped
+    depends_on:
+      - airflow-db
+      - airflow-init
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__WEBSERVER__SECRET_KEY: "mysecretkey123"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/opt/airflow/project
+    ports:
+      - "8080:8080"
+    command: bash -c "pip install apache-airflow-providers-docker && airflow webserver"
+    networks:
+      - default
+      - stocks_net
+ 
+  airflow-scheduler:
+    image: apache/airflow:2.9.1
+    container_name: airflow_scheduler
+    restart: unless-stopped
+    depends_on:
+      - airflow-db
+      - airflow-init
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://airflow:airflow@airflow-db/airflow
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/dags
+      AIRFLOW__WEBSERVER__SECRET_KEY: "mysecretkey123"
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - /var/run/docker.sock:/var/run/docker.sock
+      - .:/opt/airflow/project
+    command: bash -c "pip install apache-airflow-providers-docker && airflow scheduler"
+    networks:
+      - default
+      - stocks_net
+ 
+volumes:
+  pgdata:
+  airflow_pgdata:
+ 
+networks:
+  default:
+  stocks_net:
+    driver: bridge
+ 

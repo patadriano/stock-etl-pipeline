@@ -1,0 +1,50 @@
+---------------
+Open PostgreSQL
+    docker exec -it stocks_postgres psql -U stocksuser -d stocksdb
+    \dt
+    \q
+---------------
+Run when you edit a DAG File
+    docker exec -it airflow_scheduler airflow dags reserialize
+---------------
+Run when you want to run a DAG manually
+    docker exec -it airflow_scheduler airflow dags trigger manual_pipeline
+---------------
+Run a non-DAG Python
+    docker compose run --rm loader python load_stocks.py
+    docker compose run --rm loader python compute_indicators.py
+    docker compose run --rm loader python generate_signals.py
+---------------
+Compose airflow
+    docker compose down
+    docker compose up -d postgres airflow-db airflow-init
+/wait for 30 seconds
+    docker compose up -d airflow-webserver airflow-scheduler
+    docker exec -it airflow_scheduler airflow dags reserialize
+    docker exec -it airflow_scheduler airflow dags trigger append_stocks
+---------------
+Check active containers
+    docker ps
+---------------
+Check if scheduler is alive
+    docker exec -it airflow_scheduler airflow jobs check
+---------------
+Random Commands
+    docker exec -it airflow airflow dags list
+    docker images
+docker logs airflow
+docker exec -it airflow airflow users reset-password --username admin --password admin
+docker compose up -d postgres
+docker compose build loader
+docker compose run --rm loader
+docker exec -it airflow airflow users create --username admin --password admin --firstname Admin --lastname User --role Admin --email admin@example.com
+docker exec -it airflow_scheduler airflow dags trigger manual_pipeline
+---------------
+Power BI 
+1. Open Docker Desktop
+2. docker compose up
+3. 
+Server: localhost:5433
+Database: stocksdb
+---------------
+docker compose build loader
